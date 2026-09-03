@@ -1,0 +1,54 @@
+{
+  "payload": {
+    "export": "cart-transform-run",
+    "target": "cart.transform.run",
+    "input": {
+      "cart": {
+        "lines": [
+          {
+            "id": "gid://shopify/CartLine/1",
+            "quantity": 1,
+            "cost": {
+              "totalAmount": { "amount": "100.00" },
+              "amountPerQuantity": { "amount": "100.00" }
+            },
+            "merchandise": {
+              "__typename": "ProductVariant",
+              "id": "gid://shopify/ProductVariant/123",
+              "product": { "title": "Test product" }
+            }
+          }
+        ]
+      }
+    },
+    "output": {
+      "operations": [
+        {
+          "lineExpand": {
+            "cartLineId": "gid://shopify/CartLine/1",
+            "expandedCartItems": [
+              {
+                "merchandiseId": "gid://shopify/ProductVariant/123",
+                "quantity": 1,
+                "price": {
+                  "adjustment": {
+                    "fixedPricePerUnit": { "amount": "100.00" }
+                  }
+                }
+              },
+              {
+                "merchandiseId": "gid://shopify/ProductVariant/44501867167809",
+                "quantity": 1,
+                "price": {
+                  "adjustment": {
+                    "fixedPricePerUnit": { "amount": "3.00" }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
