@@ -4,12 +4,7 @@
     "target": "cart.transform.run",
     "input": {
       "cart": {
-        "lines": [
-          {
-            "id": "gid://shopify/CartLine/1",
-            "quantity": 1
-          }
-        ]
+        "lines": []
       }
     },
     "output": {

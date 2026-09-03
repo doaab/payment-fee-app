@@ -5,70 +5,87 @@ import type {
 } from "../generated/api";
 
 const FEE_VARIANT_ID = "gid://shopify/ProductVariant/44501867167809";
-const FEE_PERCENTAGE = 0.03; // 3%
+const FEE_PERCENTAGE = 0.03;
+const NO_CHANGES: CartTransformRunResult = { operations: [] };
 
-export function cartTransformRun(input: CartTransformRunInput): CartTransformRunResult {
-  console.log("=== Cart Transform Function is running ===");
-  console.log("Number of lines:", input.cart.lines.length);
-
-  const operations: Operation[] = [];
-
-  // حساب المجموع
-  let subtotal = 0;
-  for (const line of input.cart.lines) {
-    if (
+export function cartTransformRun(
+  input: CartTransformRunInput,
+): CartTransformRunResult {
+  const merchandiseLines = input.cart.lines.filter(
+    (line) =>
       line.merchandise.__typename === "ProductVariant" &&
-      line.merchandise.id === FEE_VARIANT_ID
-    ) {
-      continue;
-    }
-    subtotal += parseFloat(line.cost.totalAmount.amount);
+      line.merchandise.id !== FEE_VARIANT_ID,
+  );
+
+  if (merchandiseLines.length === 0) {
+    return NO_CHANGES;
   }
 
-  console.log("Subtotal:", subtotal);
-
-  if (subtotal <= 0) {
-    return { operations: [] };
-  }
-
-  const feeAmount = (subtotal * FEE_PERCENTAGE).toFixed(2);
-  console.log("Fee amount:", feeAmount);
-
-  // هل منتج الرسوم موجود؟
   const feeLineExists = input.cart.lines.some(
     (line) =>
       line.merchandise.__typename === "ProductVariant" &&
-      line.merchandise.id === FEE_VARIANT_ID
+      line.merchandise.id === FEE_VARIANT_ID,
   );
 
-  if (!feeLineExists) {
-    // نحاول إضافة الرسم باستخدام أول منتج كأساس
-    const firstLine = input.cart.lines[0];
-    if (firstLine && firstLine.merchandise.__typename === "ProductVariant") {
-      operations.push({
-        lineExpand: {
-          cartLineId: firstLine.id,
-          expandedCartItems: [
-            {
-              merchandiseId: firstLine.merchandise.id,
-              quantity: firstLine.quantity,
-            },
-            {
-              merchandiseId: FEE_VARIANT_ID,
-              quantity: 1,
-              price: {
-                adjustment: {
-                  fixedPricePerUnit: {
-                    amount: feeAmount,
-                  },
+  if (feeLineExists) {
+    return NO_CHANGES;
+  }
+
+  const subtotal = merchandiseLines.reduce(
+    (total, line) => total + Number(line.cost.totalAmount.amount),
+    0,
+  );
+
+  if (!Number.isFinite(subtotal) || subtotal <= 0) {
+    return NO_CHANGES;
+  }
+
+  // A quantity-one parent preserves the 3% fee exactly to the cent.
+  const parentLine =
+    merchandiseLines.find((line) => line.quantity === 1) ?? merchandiseLines[0];
+
+  if (!parentLine || parentLine.merchandise.__typename !== "ProductVariant") {
+    return NO_CHANGES;
+  }
+
+  const feeTotal = Number((subtotal * FEE_PERCENTAGE).toFixed(2));
+  const feePerParentUnit = (feeTotal / parentLine.quantity).toFixed(2);
+
+  if (Number(feePerParentUnit) <= 0) {
+    return NO_CHANGES;
+  }
+
+  const operations: Operation[] = [
+    {
+      lineExpand: {
+        cartLineId: parentLine.id,
+        expandedCartItems: [
+          {
+            merchandiseId: parentLine.merchandise.id,
+            quantity: 1,
+            price: {
+              adjustment: {
+                fixedPricePerUnit: {
+                  amount: parentLine.cost.amountPerQuantity.amount,
                 },
               },
             },
-          ],
-        },
-      });
-    }
-  }
+          },
+          {
+            merchandiseId: FEE_VARIANT_ID,
+            quantity: 1,
+            price: {
+              adjustment: {
+                fixedPricePerUnit: {
+                  amount: feePerParentUnit,
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+  ];
 
   return { operations };
 }
